@@ -7,6 +7,24 @@ const cors = require('cors');
 const bodyParser = require('body-parser');
 const cookieParser = require('cookie-parser');
 const jwt = require('jsonwebtoken');
+const fs = require('fs');
+const multer = require('multer');
+const { cp } = require('fs/promises');
+const storage = multer.diskStorage({
+	destination: (req, file, cb) => {
+		const user = req.body.user;
+		if (fs.existsSync(`uploads/${user}`)) {
+			cb(null, `uploads/${user}/`);
+		} else {
+			fs.mkdirSync(`uploads/${user}`);
+			cb(null, `uploads/${user}/`);
+		}
+	},
+	filename: (req, file, cb) => {
+		cb(null, file.originalname);
+	},
+});
+const upload = multer({ storage: storage });
 
 dotenv.config();
 
@@ -163,6 +181,15 @@ app.get('/logout', (req, res) => {
 	} catch (error) {
 		res.status(500).json(error);
 	}
+});
+
+app.post('/userThumbnail', upload.single('img'), (req, res) => {
+	// if (fs.existsSync('uploads/user')) {
+	// 	return;
+	// } else {
+	// 	fs.mkdirSync('uploads/user');
+	// }
+	console.log(req.body.user);
 });
 
 app.listen(8080, () => {
