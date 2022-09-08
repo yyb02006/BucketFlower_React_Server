@@ -10,21 +10,26 @@ const jwt = require('jsonwebtoken');
 const fs = require('fs');
 const multer = require('multer');
 const { cp } = require('fs/promises');
+const exp = require('constants');
+const { send } = require('process');
 const storage = multer.diskStorage({
 	destination: (req, file, cb) => {
-		const user = req.body.user;
-		if (fs.existsSync(`uploads/${user}`)) {
-			cb(null, `uploads/${user}/`);
+		const user = req.body.author;
+		const title = req.body.title;
+		console.log(file);
+		if (fs.existsSync(`uploads/${user}/${title}`)) {
+			cb(null, `uploads/${user}/${title}`);
 		} else {
-			fs.mkdirSync(`uploads/${user}`);
-			cb(null, `uploads/${user}/`);
+			fs.mkdirSync(`uploads/${user}/${title}`);
+			cb(null, `uploads/${user}/${title}`);
 		}
 	},
 	filename: (req, file, cb) => {
-		cb(null, file.originalname);
+		cb(null, Date.now() + file.originalname);
 	},
 });
 const upload = multer({ storage: storage });
+// const uploadThumbnail = multer({ storage: Thumbnail });
 
 dotenv.config();
 
@@ -45,6 +50,7 @@ app.use(
 	})
 );
 app.use(cookieParser());
+app.use(express.static('uploads'));
 
 app.get('/', (req, res) => {});
 
@@ -183,13 +189,39 @@ app.get('/logout', (req, res) => {
 	}
 });
 
-app.post('/userThumbnail', upload.single('img'), (req, res) => {
-	// if (fs.existsSync('uploads/user')) {
-	// 	return;
-	// } else {
-	// 	fs.mkdirSync('uploads/user');
-	// }
-	console.log(req.body.user);
+app.post('/userThumbnail', upload.array('img'), (req, res) => {
+	// const userImage = `INSERT INTO images (Title,FileName,Author,path) VALUES ('${req.body.id}','${req.body.password}')`;
+	const insertList = `INSERT INTO bucketlist (Title,Contents,Author) VALUES ('${req.body.title}','${req.body.contents}','${req.body.author}')`;
+	db.query(insertList, (err, result) => {
+		res.json('success!');
+		if (err) {
+			console.log(err);
+			res.status(500).json(err);
+		}
+	});
+	req.files.map((file) =>
+		db.query(
+			`INSERT INTO images (Title,FileName,Author,path) VALUES ('${req.body.title}','${file.filename}','${req.body.author}','${file.path}')`,
+			(err, result) => {
+				if (err) {
+					console.log(err);
+					res.status(500).json(err);
+				}
+			}
+		)
+	);
+});
+
+app.post('/userList', (req, res) => {
+	const selectList = `SELECT * FROM bucketlist WHERE author = '${req.body.id}'`;
+	console.log('!!!!!!!!!!!!!' + req.body.id);
+	db.query(selectList, (err, result) => {
+		res.status(200).json(result);
+		if (err) {
+			console.log(err);
+			res.status(500).json(err);
+		}
+	});
 });
 
 app.listen(8080, () => {
