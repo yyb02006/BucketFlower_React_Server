@@ -99,6 +99,7 @@ app.use(
 );
 app.use(cookieParser());
 app.use(express.static('uploads'));
+app.use(express.static('public'));
 
 app.get('/', (req, res) => {});
 
@@ -459,6 +460,36 @@ app.post('/users', (req, res) => {
 	const selectUsers = `SELECT usernickname, userimage FROM users WHERE userid = '${userid}'`;
 	db.query(selectUsers, (err, result) => {
 		res.json(result);
+	});
+});
+
+app.post('/loadRewards', (req, res) => {
+	const selectRewards = `SELECT * FROM rewards`;
+	db.query(selectRewards, (err, result) => {
+		res.status(200).json(result);
+		if (err) {
+			res.status(500).json(err);
+		}
+	});
+});
+
+app.post('/setreward', (req, res) => {
+	const insertRewards = `INSERT INTO userrewards (userid, filename, category, theme) values('${req.body.userid}','${req.body.rewards}','${req.body.category}','${req.body.theme}')`;
+	db.query(insertRewards, (err, result) => {
+		res.status(200).json(result);
+		if (err) {
+			res.status(500).json(err);
+		}
+	});
+});
+
+app.post('/selectreward', (req, res) => {
+	const selectRewards = `SELECT * FROM userrewards WHERE userid = '${req.body.userid}'`;
+	db.query(selectRewards, (err, result) => {
+		res.status(200).json(result);
+		if (err) {
+			res.status(500).json(err);
+		}
 	});
 });
 
