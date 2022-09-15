@@ -39,11 +39,21 @@ const updateStorage = multer.diskStorage({
 		const newPath = `uploads/${user}/${title}`;
 		// console.log(user, title, prevTitle);
 		if (title !== prevTitle) {
-			const data = fs.rename(oldPath, newPath, () => {
+			if (fs.existsSync(`uploads/${user}/${prevTitle}`)) {
+				const data = fs.rename(oldPath, newPath, () => {
+					cb(null, `uploads/${user}/${title}`);
+				});
+			} else {
+				fs.mkdirSync(`uploads/${user}/${title}`);
 				cb(null, `uploads/${user}/${title}`);
-			});
+			}
 		} else {
-			cb(null, `uploads/${user}/${title}`);
+			if (fs.existsSync(`uploads/${user}/${title}`)) {
+				cb(null, `uploads/${user}/${title}`);
+			} else {
+				fs.mkdirSync(`uploads/${user}/${title}`);
+				cb(null, `uploads/${user}/${title}`);
+			}
 		}
 	},
 	filename: (req, file, cb) => {
@@ -109,6 +119,21 @@ app.post('/check', (req, res) => {
 	});
 });
 
+app.post('/checkname', (req, res) => {
+	const selectName = `SELECT usernickname FROM users WHERE usernickname = '${req.body.name}'`;
+	db.query(selectName, (err, result) => {
+		if (result.length > 0) {
+			res.json({ overlap: true });
+		} else if (result.length === 0) {
+			res.json({ overlap: false });
+		} else if (err) {
+			res.status(500).json(err);
+		} else {
+			return;
+		}
+	});
+});
+
 app.post('/signup', (req, res) => {
 	const insertInfo = `INSERT INTO users (userid,userpassword) VALUES ('${req.body.id}','${req.body.password}')`;
 	db.query(insertInfo, (err, result) => {
@@ -132,6 +157,7 @@ app.post('/login', (req, res) => {
 			const accessToken = jwt.sign(
 				{
 					id: result[0].userid,
+					name: result[0].usernickname,
 				},
 				process.env.ACCESS_SECRET,
 				{
@@ -143,6 +169,7 @@ app.post('/login', (req, res) => {
 			const refreshToken = jwt.sign(
 				{
 					id: result[0].userid,
+					name: result[0].usernickname,
 				},
 				process.env.REFRESH_SECRET,
 				{
@@ -196,6 +223,7 @@ app.get('/refreshtoken', (req, res) => {
 		const accessToken = jwt.sign(
 			{
 				id: data.id,
+				name: data.name,
 			},
 			process.env.ACCESS_SECRET,
 			{
@@ -307,7 +335,7 @@ app.post('/updatepostlist', update.array('img'), (req, res) => {
 			)
 		);
 	} else {
-		fs.rename(oldPath, newPath, (err) => {
+		fs.renameSync(oldPath, newPath, (err) => {
 			console.log(err);
 		});
 	}
@@ -326,7 +354,7 @@ app.post('/updatepostlist', update.array('img'), (req, res) => {
 						}
 					}
 				);
-				fs.unlink(`${newPath}/${Delete}`, (err) => {
+				fs.unlinkSync(`${newPath}/${Delete}`, (err) => {
 					console.log(err);
 				});
 			});
@@ -342,7 +370,7 @@ app.post('/updatepostlist', update.array('img'), (req, res) => {
 					}
 				}
 			);
-			fs.unlink(`${newPath}/${req.body.toDelete}`, (err) => {
+			fs.unlinkSync(`${newPath}/${req.body.toDelete}`, (err) => {
 				console.log(err);
 			});
 		}
@@ -414,6 +442,23 @@ app.post('/userprofile', (req, res) => {
 		} else {
 			return;
 		}
+	});
+});
+
+app.post('/changeusernickname', (req, res) => {
+	const userid = req.body.id;
+	const newName = req.body.name;
+	const updateName = `UPDATE users SET usernickname = '${newName}' WHERE userid = '${userid}'`;
+	db.query(updateName, (err, result) => {
+		res.json(result);
+	});
+});
+
+app.post('/users', (req, res) => {
+	const userid = req.body.userid;
+	const selectUsers = `SELECT usernickname, userimage FROM users WHERE userid = '${userid}'`;
+	db.query(selectUsers, (err, result) => {
+		res.json(result);
 	});
 });
 
