@@ -493,6 +493,51 @@ app.post('/selectreward', (req, res) => {
 	});
 });
 
+app.post('/submitdisplayed', (req, res) => {
+	res.json('success');
+	const displayedArr = req.body.displayed.filter((arr) => arr !== null);
+	const selectDisplayed = `SELECT imagekey FROM displayedrewards WHERE userid ='${req.body.userid}'`;
+	const insertDisplayed = (id, file, x, y, key) =>
+		`INSERT INTO displayedrewards (userid, filename, posx, posy, imagekey) VALUES ('${id}','${file}','${x}','${y}','${key}')`;
+	const updateDisplayed = (file, x, y, key) =>
+		`UPDATE displayedrewards SET filename = '${file}', posx = '${x}', posy = '${y}' WHERE imagekey = ${key}`;
+
+	if (displayedArr.length > 0) {
+		db.query(selectDisplayed, (err, result) => {
+			displayedArr.map((arr) => {
+				if (result.map((arr) => arr.imagekey).includes(arr.key)) {
+					db.query(
+						updateDisplayed(arr.filename, arr.posx, arr.posy, arr.key),
+						(err, result) => {
+							if (err) {
+								console.log(err);
+							}
+						}
+					);
+				} else {
+					db.query(
+						insertDisplayed(
+							arr.userid,
+							arr.filename,
+							arr.posx,
+							arr.posy,
+							arr.key
+						),
+						(err, result) => {
+							if (err) {
+								console.log(err);
+							}
+						}
+					);
+				}
+			});
+			if (err) {
+				console.log(err);
+			}
+		});
+	}
+});
+
 app.listen(8080, () => {
 	console.log(`Running on port 8080`);
 });
