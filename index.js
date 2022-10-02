@@ -474,11 +474,15 @@ app.post('/loadRewards', (req, res) => {
 });
 
 app.post('/setreward', (req, res) => {
-	const insertRewards = `INSERT INTO userrewards (userid, filename, category, theme) values('${req.body.userid}','${req.body.rewards}','${req.body.category}','${req.body.theme}')`;
-	db.query(insertRewards, (err, result) => {
-		res.status(200).json(result);
+	const insertRewards = `INSERT INTO userrewards (userid, filename, category, theme, basicangle, matchlist) values('${req.body.userid}','${req.body.rewards}','${req.body.category}','${req.body.theme}','${req.body.basicangle}','${req.body.listid}');`;
+	const updateBucketlist = `UPDATE bucketlist SET isCompleted = '1' WHERE id = '${req.body.listid}';`;
+	console.log('id=' + req.body.listid);
+	db.query(insertRewards + updateBucketlist, (err, result) => {
 		if (err) {
 			res.status(500).json(err);
+			console.log(err);
+		} else {
+			res.status(200).json(result);
 		}
 	});
 });
@@ -497,17 +501,23 @@ app.post('/submitdisplayed', (req, res) => {
 	res.json('success');
 	const displayedArr = req.body.displayed.filter((arr) => arr !== null);
 	const selectDisplayed = `SELECT imagekey FROM displayedrewards WHERE userid ='${req.body.userid}'`;
-	const insertDisplayed = (id, file, x, y, key) =>
-		`INSERT INTO displayedrewards (userid, filename, posx, posy, imagekey) VALUES ('${id}','${file}','${x}','${y}','${key}')`;
-	const updateDisplayed = (file, x, y, key) =>
-		`UPDATE displayedrewards SET filename = '${file}', posx = '${x}', posy = '${y}' WHERE imagekey = ${key}`;
+	const insertDisplayed = (id, file, x, y, key, angle) =>
+		`INSERT INTO displayedrewards (userid, filename, posx, posy, imagekey, angle) VALUES ('${id}','${file}','${x}','${y}','${key}','${angle}')`;
+	const updateDisplayed = (file, x, y, key, angle) =>
+		`UPDATE displayedrewards SET filename = '${file}', posx = '${x}', posy = '${y}', angle = '${angle}' WHERE imagekey = ${key}`;
 
 	if (displayedArr.length > 0) {
 		db.query(selectDisplayed, (err, result) => {
 			displayedArr.map((arr) => {
-				if (result.map((arr) => arr.imagekey).includes(arr.key)) {
+				if (result.map((arr) => arr.imagekey).includes(arr.imagekey)) {
 					db.query(
-						updateDisplayed(arr.filename, arr.posx, arr.posy, arr.key),
+						updateDisplayed(
+							arr.filename,
+							arr.posx,
+							arr.posy,
+							arr.imagekey,
+							arr.angle
+						),
 						(err, result) => {
 							if (err) {
 								console.log(err);
@@ -521,7 +531,8 @@ app.post('/submitdisplayed', (req, res) => {
 							arr.filename,
 							arr.posx,
 							arr.posy,
-							arr.key
+							arr.imagekey,
+							arr.angle
 						),
 						(err, result) => {
 							if (err) {
@@ -536,6 +547,43 @@ app.post('/submitdisplayed', (req, res) => {
 			}
 		});
 	}
+});
+
+app.post('/loaddisplayed', (req, res) => {
+	const userid = req.body.userid;
+	const selectDisplayed = `SELECT * FROM displayedrewards WHERE userid = '${userid}'`;
+	db.query(selectDisplayed, (err, result) => {
+		res.status(200).json(result);
+		if (err) {
+			res.status(500).json(err);
+		}
+	});
+});
+
+app.post('/deleteDisplayed', (req, res) => {
+	const userid = req.body.userid;
+	const imagekey = req.body.imagekey;
+	const deleteDisplayed = `DELETE FROM displayedrewards WHERE imagekey = '${imagekey}' AND userid = '${userid}'`;
+	db.query(deleteDisplayed, (err, result) => {
+		res.status(200).json(result);
+		console.log('deleted', userid, imagekey);
+		if (err) {
+			console.log(err);
+		}
+	});
+});
+
+app.post('/gallary', (req, res) => {
+	const userid = req.body.userid;
+	console.log(userid);
+	const selectImages = `SELECT * FROM images WHERE Author = '${userid}'`;
+	db.query(selectImages, (err, result) => {
+		res.status(200).json(result);
+		console.log(result);
+		if (err) {
+			console.log(err);
+		}
+	});
 });
 
 app.listen(8080, () => {
