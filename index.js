@@ -385,24 +385,50 @@ app.post('/deletelist', (req, res) => {
 	const title = req.body.title;
 	const deleteImages = `DELETE FROM images WHERE Title = '${title}' AND Author = '${userid}';`;
 	const deleteBukcetList = `DELETE FROM bucketlist WHERE Title = '${title}' AND Author = '${userid}';`;
-	db.query(deleteBukcetList + deleteImages, (err, result) => {
-		res.status(200).json('success');
+	const selectMatchId = `SELECT id FROM bucketlist WHERE Title = '${title}'`;
+	db.query(selectMatchId, (err, match) => {
+		const selectUserrewards = `SELECT id FROM userrewards WHERE matchlist = '${match[0].id}';`;
+		const deleteUserrewards = `DELETE FROM userrewards WHERE matchlist = '${match[0].id}';`;
+		db.query(selectUserrewards, (err, result) => {
+			if (result.length > 0) {
+				const deleteDisplayedrewards = `DELETE FROM displayedrewards WHERE imagekey = '${result[0].id}';`;
+				if (err) {
+					console.log(err);
+				}
+				db.query(deleteDisplayedrewards, (err, result) => {
+					if (err) {
+						console.log(err);
+					}
+				});
+			}
+		});
+		db.query(
+			deleteBukcetList + deleteImages + deleteUserrewards,
+			(err, result) => {
+				res.status(200).json('success');
+				if (err) {
+					console.log(err);
+					res.status(500).json(err);
+				} else {
+					return;
+				}
+			}
+		);
 		if (err) {
 			console.log(err);
-			res.status(500).json(err);
-		} else {
-			return;
 		}
 	});
-	const files = fs.readdirSync(`uploads/${userid}/${title}`);
+
+	let files = [];
+	if (fs.existsSync(`uploads/${userid}/${title}`)) {
+		files = fs.readdirSync(`uploads/${userid}/${title}`);
+	}
 	if (files.length > 0) {
 		files.map((file) =>
 			fs.unlinkSync(`uploads/${userid}/${title}/${file}`, (err) => {
 				console.log(err);
 			})
 		);
-		fs.rmdirSync(`uploads/${userid}/${title}`);
-	} else {
 		fs.rmdirSync(`uploads/${userid}/${title}`);
 	}
 });
@@ -474,7 +500,7 @@ app.post('/loadRewards', (req, res) => {
 });
 
 app.post('/setreward', (req, res) => {
-	const insertRewards = `INSERT INTO userrewards (userid, filename, category, theme, basicangle, matchlist) values('${req.body.userid}','${req.body.rewards}','${req.body.category}','${req.body.theme}','${req.body.basicangle}','${req.body.listid}');`;
+	const insertRewards = `INSERT INTO userrewards (userid, filename, category, theme, basicangle, matchlist, basicleft, basictop, basicwidth, basicheight) values('${req.body.userid}','${req.body.rewards}','${req.body.category}','${req.body.theme}','${req.body.basicangle}','${req.body.listid}','${req.body.basicleft}','${req.body.basictop}','${req.body.basicwidth}','${req.body.basicheight}');`;
 	const updateBucketlist = `UPDATE bucketlist SET isCompleted = '1' WHERE id = '${req.body.listid}';`;
 	console.log('id=' + req.body.listid);
 	db.query(insertRewards + updateBucketlist, (err, result) => {
@@ -501,8 +527,19 @@ app.post('/submitdisplayed', (req, res) => {
 	res.json('success');
 	const displayedArr = req.body.displayed.filter((arr) => arr !== null);
 	const selectDisplayed = `SELECT imagekey FROM displayedrewards WHERE userid ='${req.body.userid}'`;
-	const insertDisplayed = (id, file, x, y, key, angle) =>
-		`INSERT INTO displayedrewards (userid, filename, posx, posy, imagekey, angle) VALUES ('${id}','${file}','${x}','${y}','${key}','${angle}')`;
+	const insertDisplayed = (
+		id,
+		file,
+		x,
+		y,
+		key,
+		angle,
+		basicLeft,
+		basicTop,
+		basicWidth,
+		basicHeight
+	) =>
+		`INSERT INTO displayedrewards (userid, filename, posx, posy, imagekey, angle, basicleft, basictop, basicwidth, basicheight) VALUES ('${id}','${file}','${x}','${y}','${key}','${angle}','${basicLeft}','${basicTop}','${basicWidth}','${basicHeight}')`;
 	const updateDisplayed = (file, x, y, key, angle) =>
 		`UPDATE displayedrewards SET filename = '${file}', posx = '${x}', posy = '${y}', angle = '${angle}' WHERE imagekey = ${key}`;
 
@@ -532,7 +569,11 @@ app.post('/submitdisplayed', (req, res) => {
 							arr.posx,
 							arr.posy,
 							arr.imagekey,
-							arr.angle
+							arr.angle,
+							arr.basicleft,
+							arr.basictop,
+							arr.basicwidth,
+							arr.basicheight
 						),
 						(err, result) => {
 							if (err) {
