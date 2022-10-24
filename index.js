@@ -12,16 +12,29 @@ const multer = require('multer');
 const { cp } = require('fs/promises');
 const exp = require('constants');
 const { send } = require('process');
+
+dotenv.config();
+
 const storage = multer.diskStorage({
 	destination: (req, file, cb) => {
 		const user = req.body.author;
 		const title = req.body.title;
 		// console.log(file);
-		if (fs.existsSync(`uploads/${user}/${title}`)) {
-			cb(null, `uploads/${user}/${title}`);
+		if (fs.existsSync(`uploads/${user}`)) {
+			if (fs.existsSync(`uploads/${user}/${title}`)) {
+				cb(null, `uploads/${user}/${title}`);
+			} else {
+				fs.mkdirSync(`uploads/${user}/${title}`);
+				cb(null, `uploads/${user}/${title}`);
+			}
 		} else {
-			fs.mkdirSync(`uploads/${user}/${title}`);
-			cb(null, `uploads/${user}/${title}`);
+			fs.mkdirSync(`uploads/${user}`);
+			if (fs.existsSync(`uploads/${user}/${title}`)) {
+				cb(null, `uploads/${user}/${title}`);
+			} else {
+				fs.mkdirSync(`uploads/${user}/${title}`);
+				cb(null, `uploads/${user}/${title}`);
+			}
 		}
 	},
 	filename: (req, file, cb) => {
@@ -38,21 +51,42 @@ const updateStorage = multer.diskStorage({
 		const oldPath = `uploads/${user}/${prevTitle}`;
 		const newPath = `uploads/${user}/${title}`;
 		// console.log(user, title, prevTitle);
-		if (title !== prevTitle) {
-			if (fs.existsSync(`uploads/${user}/${prevTitle}`)) {
-				const data = fs.rename(oldPath, newPath, () => {
+		if (fs.existsSync(`uploads/${user}`)) {
+			if (title !== prevTitle) {
+				if (fs.existsSync(`uploads/${user}/${prevTitle}`)) {
+					const data = fs.rename(oldPath, newPath, () => {
+						cb(null, `uploads/${user}/${title}`);
+					});
+				} else {
+					fs.mkdirSync(`uploads/${user}/${title}`);
 					cb(null, `uploads/${user}/${title}`);
-				});
+				}
 			} else {
-				fs.mkdirSync(`uploads/${user}/${title}`);
-				cb(null, `uploads/${user}/${title}`);
+				if (fs.existsSync(`uploads/${user}/${title}`)) {
+					cb(null, `uploads/${user}/${title}`);
+				} else {
+					fs.mkdirSync(`uploads/${user}/${title}`);
+					cb(null, `uploads/${user}/${title}`);
+				}
 			}
 		} else {
-			if (fs.existsSync(`uploads/${user}/${title}`)) {
-				cb(null, `uploads/${user}/${title}`);
+			fs.mkdirSync(`uploads/${user}`);
+			if (title !== prevTitle) {
+				if (fs.existsSync(`uploads/${user}/${prevTitle}`)) {
+					const data = fs.rename(oldPath, newPath, () => {
+						cb(null, `uploads/${user}/${title}`);
+					});
+				} else {
+					fs.mkdirSync(`uploads/${user}/${title}`);
+					cb(null, `uploads/${user}/${title}`);
+				}
 			} else {
-				fs.mkdirSync(`uploads/${user}/${title}`);
-				cb(null, `uploads/${user}/${title}`);
+				if (fs.existsSync(`uploads/${user}/${title}`)) {
+					cb(null, `uploads/${user}/${title}`);
+				} else {
+					fs.mkdirSync(`uploads/${user}/${title}`);
+					cb(null, `uploads/${user}/${title}`);
+				}
 			}
 		}
 	},
@@ -78,13 +112,11 @@ const profileStorage = multer.diskStorage({
 });
 const uploadProfile = multer({ storage: profileStorage });
 
-dotenv.config();
-
 const db = mysql.createConnection({
-	host: '127.0.0.1',
-	user: 'root',
-	password: 'filenoche1',
-	database: 'bucketflower',
+	host: process.env.DB_Host,
+	user: process.env.DB_User,
+	password: process.env.DB_Password,
+	database: process.env.DB_database,
 	port: '3306',
 	multipleStatements: true,
 });
@@ -93,7 +125,7 @@ const db = mysql.createConnection({
 app.use(express.json());
 app.use(
 	cors({
-		origin: 'http://localhost:3000',
+		origin: process.env.CORS_Origin,
 		credentials: true,
 	})
 );
@@ -109,10 +141,10 @@ app.post('/check', (req, res) => {
 	const selectInfo = `select userid from users WHERE userid='${req.body.id}'`;
 	db.query(selectInfo, (err, result) => {
 		// console.log(result.length);
-		if (result.length > 0) {
-			res.json({ overlap: 0 });
-		} else if (result.length === 0) {
+		if (result.length === 0 || undefined) {
 			res.json({ overlap: 1 });
+		} else if (result.length > 0) {
+			res.json({ overlap: 0 });
 		}
 		if (err) {
 			console.log(err);
@@ -123,10 +155,10 @@ app.post('/check', (req, res) => {
 app.post('/checkname', (req, res) => {
 	const selectName = `SELECT usernickname FROM users WHERE usernickname = '${req.body.name}'`;
 	db.query(selectName, (err, result) => {
-		if (result.length > 0) {
-			res.json({ overlap: true });
-		} else if (result.length === 0) {
+		if (result.length === 0 || undefined) {
 			res.json({ overlap: false });
+		} else if (result.length > 0) {
+			res.json({ overlap: true });
 		} else if (err) {
 			res.status(500).json(err);
 		} else {
@@ -136,7 +168,7 @@ app.post('/checkname', (req, res) => {
 });
 
 app.post('/signup', (req, res) => {
-	const insertInfo = `INSERT INTO users (userid,userpassword) VALUES ('${req.body.id}','${req.body.password}')`;
+	const insertInfo = `INSERT INTO users (userid,userpassword,usernickname) VALUES ('${req.body.id}','${req.body.password}','${req.body.name}')`;
 	db.query(insertInfo, (err, result) => {
 		res.json('success!');
 		if (err) {
@@ -335,7 +367,7 @@ app.post('/updatepostlist', update.array('img'), (req, res) => {
 				}
 			)
 		);
-	} else {
+	} else if (fs.existsSync(oldPath)) {
 		fs.renameSync(oldPath, newPath, (err) => {
 			console.log(err);
 		});
@@ -492,9 +524,11 @@ app.post('/users', (req, res) => {
 app.post('/loadRewards', (req, res) => {
 	const selectRewards = `SELECT * FROM rewards`;
 	db.query(selectRewards, (err, result) => {
-		res.status(200).json(result);
 		if (err) {
+			console.log(err);
 			res.status(500).json(err);
+		} else {
+			res.status(200).json(result);
 		}
 	});
 });
